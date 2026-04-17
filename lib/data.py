@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
+from urllib.request import urlopen   # used only for FRED
 
 logger = logging.getLogger(__name__)
 
@@ -127,21 +128,15 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Robust parser that works reliably on GitHub Actions.
+    This version is robust against FRED's comment header lines.
     """
-    if end_date is None:
-        end_date = datetime.now()
-    
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    # Read the raw FRED text file
     df = pd.read_csv(
         url,
         sep=r"\s+",           # whitespace separated
-        skiprows=19,          # skip the header comments
-        names=["DATE", "VALUE"],   # force column names
+        comment="#",          # ← This automatically skips ALL comment lines
         parse_dates=["DATE"],
-        date_format="%Y-%m-%d",
         index_col="DATE",
     )
     
@@ -167,14 +162,12 @@ def get_last_trading_day(date: Optional[datetime] = None) -> datetime:
 
 
 def is_last_trading_day(date: Optional[datetime] = None) -> bool:
-    """Check if today is the last trading day of the month."""
     if date is None:
         date = datetime.now()
     return date.date() == get_last_trading_day(date).date()
 
 
 def is_first_trading_day(date: Optional[datetime] = None) -> bool:
-    """Check if today is the first trading day of the month."""
     if date is None:
         date = datetime.now()
     first_day = datetime(date.year, date.month, 1)

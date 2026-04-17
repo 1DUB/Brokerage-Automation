@@ -4,14 +4,13 @@ Data fetching layer. Downloads monthly adjusted-close prices from Yahoo Finance 
 
 import yfinance as yf
 import pandas as pd
-import pandas_datareader.data as web
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Ticker aliases (none needed for this model — all use standard liquid ETFs)
+# Ticker aliases (none needed for this model)
 TICKER_ALIASES = {}
 
 
@@ -24,9 +23,10 @@ def fetch_monthly_prices(
     months_history: int = 15,
     end_date: Optional[datetime] = None,
 ) -> pd.DataFrame:
-    """(Unchanged from your original — fetches Yahoo prices)"""
+    """Fetch month-end adjusted close prices from Yahoo Finance."""
     if end_date is None:
         end_date = datetime.now()
+    
     start_date = end_date - timedelta(days=(months_history + 3) * 31)
     
     resolved = {t: resolve_ticker(t) for t in tickers}
@@ -43,7 +43,7 @@ def fetch_monthly_prices(
     )
     
     if raw.empty:
-        raise RuntimeError("Yahoo Finance returned no data.")
+        raise RuntimeError("Yahoo Finance returned no data. Check tickers and dates.")
     
     if len(yahoo_tickers) == 1:
         close = raw[["Close"]].copy()
@@ -58,12 +58,16 @@ def fetch_monthly_prices(
         if yahoo_ticker in monthly.columns:
             result[strategy_ticker] = monthly[yahoo_ticker]
         else:
+            logger.warning(f"No data for {strategy_ticker} ({yahoo_ticker})")
             result[strategy_ticker] = float("nan")
     
     result = result.dropna(how="all")
     
     if len(result) < 13:
-        raise RuntimeError(f"Only {len(result)} months of data available.")
+        raise RuntimeError(
+            f"Only {len(result)} months of data available, need at least 13 "
+            f"for 12-month momentum calculation."
+        )
     
     return result
 
@@ -73,9 +77,10 @@ def fetch_daily_prices(
     months_history: int = 13,
     end_date: Optional[datetime] = None,
 ) -> pd.DataFrame:
-    """(Unchanged — used by Stoken if needed)"""
+    """Fetch daily adjusted close prices from Yahoo Finance."""
     if end_date is None:
         end_date = datetime.now()
+    
     start_date = end_date - timedelta(days=(months_history + 2) * 31)
     
     resolved = {t: resolve_ticker(t) for t in tickers}
@@ -105,47 +110,70 @@ def fetch_daily_prices(
         if yahoo_ticker in close.columns:
             result[strategy_ticker] = close[yahoo_ticker]
         else:
+            logger.warning(f"No daily data for {strategy_ticker} ({yahoo_ticker})")
             result[strategy_ticker] = float("nan")
     
     result = result.ffill().dropna(how="all")
+    
+    if len(result) < 200:
+        raise RuntimeError(
+            f"Only {len(result)} days of data available, need at least 200 "
+            f"for correlation calculation."
+        )
+    
     return result
 
 
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
-    Fetch monthly US Unemployment Rate (UNRATE) from FRED.
-    Used by Lethargic AA for Growth-Trend Timing.
+    Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
+    Most reliable long-term method — no extra dependencies.
     """
     if end_date is None:
         end_date = datetime.now()
     
-    start = end_date - timedelta(days=20*365)  # ~20 years buffer
+    # Official FRED CSV endpoint for UNRATE
+    url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    ue = web.DataReader('UNRATE', 'fred', start, end_date)
-    ue = ue.resample('ME').last()
-    return ue['UNRATE']
+    df = pd.read_csv(
+        url,
+        sep=r"\s+",          # whitespace separated
+        skiprows=19,         # skip header lines
+        parse_dates=["DATE"],
+        date_format="%Y-%m-%d",
+        index_col="DATE",
+    )
+    
+    ue = df["VALUE"]
+    ue = ue.resample("ME").last()      # ensure month-end
+    return ue
 
 
 def get_last_trading_day(date: Optional[datetime] = None) -> datetime:
-    """(Unchanged from your original)"""
+    """Determine the last trading day of the month."""
     if date is None:
         date = datetime.now()
+    
     if date.month == 12:
         last_day = datetime(date.year + 1, 1, 1) - timedelta(days=1)
     else:
         last_day = datetime(date.year, date.month + 1, 1) - timedelta(days=1)
-    while last_day.weekday() > 4:
+    
+    while last_day.weekday() > 4:  # 5=Saturday, 6=Sunday
         last_day -= timedelta(days=1)
+    
     return last_day
 
 
 def is_last_trading_day(date: Optional[datetime] = None) -> bool:
+    """Check if today is the last trading day of the month."""
     if date is None:
         date = datetime.now()
     return date.date() == get_last_trading_day(date).date()
 
 
 def is_first_trading_day(date: Optional[datetime] = None) -> bool:
+    """Check if today is the first trading day of the month."""
     if date is None:
         date = datetime.now()
     first_day = datetime(date.year, date.month, 1)

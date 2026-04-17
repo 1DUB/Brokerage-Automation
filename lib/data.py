@@ -127,18 +127,19 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Most reliable long-term method — no extra dependencies.
+    Robust parser that works reliably on GitHub Actions.
     """
     if end_date is None:
         end_date = datetime.now()
     
-    # Official FRED CSV endpoint for UNRATE
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
+    # Read the raw FRED text file
     df = pd.read_csv(
         url,
-        sep=r"\s+",          # whitespace separated
-        skiprows=19,         # skip header lines
+        sep=r"\s+",           # whitespace separated
+        skiprows=19,          # skip the header comments
+        names=["DATE", "VALUE"],   # force column names
         parse_dates=["DATE"],
         date_format="%Y-%m-%d",
         index_col="DATE",

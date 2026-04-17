@@ -7,7 +7,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
-from urllib.request import urlopen   # used only for FRED
 
 logger = logging.getLogger(__name__)
 
@@ -128,14 +127,17 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    This version is robust against FRED's comment header lines.
+    This version is the most reliable long-term method.
     """
+    if end_date is None:
+        end_date = datetime.now()
+    
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
     df = pd.read_csv(
         url,
         sep=r"\s+",           # whitespace separated
-        comment="#",          # ← This automatically skips ALL comment lines
+        comment="#",          # This automatically skips ALL comment lines at the top
         parse_dates=["DATE"],
         index_col="DATE",
     )

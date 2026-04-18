@@ -7,7 +7,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -128,34 +127,27 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Includes retry logic for transient network issues (common on GitHub Actions).
+    This is the most reliable long-term method.
     """
     if end_date is None:
         end_date = datetime.now()
     
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    for attempt in range(3):  # retry up to 3 times
-        try:
-            df = pd.read_csv(
-                url,
-                sep=r"\s+",
-                comment="#",          # skips all FRED header comments
-                parse_dates=["DATE"],
-                index_col="DATE",
-            )
-            ue = df["VALUE"]
-            ue = ue.resample("ME").last()
-            logger.info("Successfully fetched unemployment rate from FRED")
-            return ue
-        except Exception as e:
-            logger.warning(f"FRED fetch attempt {attempt+1} failed: {e}")
-            if attempt < 2:
-                time.sleep(2 ** attempt)  # backoff: 1s, 2s, 4s
-            else:
-                raise RuntimeError(f"Failed to fetch unemployment rate after 3 attempts: {e}")
+    # Robust parser for FRED's format (comments + header)
+    df = pd.read_csv(
+        url,
+        sep=r"\s+",           # whitespace separated
+        comment="#",          # skip all comment lines
+        header=0,             # the first non-comment line is the header "DATE VALUE"
+        parse_dates=["DATE"],
+        index_col="DATE",
+    )
     
-    raise RuntimeError("Unreachable — should never get here")
+    ue = df["VALUE"]
+    ue = ue.resample("ME").last()      # ensure month-end
+    logger.info("Successfully fetched unemployment rate from FRED")
+    return ue
 
 
 def get_last_trading_day(date: Optional[datetime] = None) -> datetime:

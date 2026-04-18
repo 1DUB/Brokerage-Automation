@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
+from urllib.request import urlopen   # needed for direct FRED fetch
 
 logger = logging.getLogger(__name__)
 
@@ -127,30 +128,42 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Final robust version that avoids all parse_dates column issues.
+    Most robust version: manual line-by-line parsing to avoid all tokenizing issues.
     """
     if end_date is None:
         end_date = datetime.now()
     
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    # Read without parse_dates first, then manually convert
-    df = pd.read_csv(
-        url,
-        sep=r"\s+",
-        comment="#",
-        header=0,                    # first non-comment line is the header
-        names=["DATE", "VALUE"],     # force exact column names
-    )
+    # Download raw text
+    with urlopen(url) as response:
+        raw_text = response.read().decode('utf-8')
     
-    # Manually convert DATE column
-    df["DATE"] = pd.to_datetime(df["DATE"], format="%Y-%m-%d")
-    df = df.set_index("DATE")
+    # Parse manually
+    data = []
+    for line in raw_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        parts = line.split()
+        if len(parts) == 2:
+            date_str, value_str = parts
+            try:
+                date = pd.to_datetime(date_str, format='%Y-%m-%d')
+                value = float(value_str)
+                data.append((date, value))
+            except:
+                continue  # skip any malformed line
     
-    ue = df["VALUE"]
+    if not data:
+        raise RuntimeError("Failed to parse any unemployment data from FRED")
+    
+    df = pd.DataFrame(data, columns=['DATE', 'VALUE'])
+    df = df.set_index('DATE')
+    ue = df['VALUE']
     ue = ue.resample("ME").last()
     
-    logger.info("Successfully fetched unemployment rate from FRED")
+    logger.info("Successfully fetched unemployment rate from FRED (manual parse)")
     return ue
 
 

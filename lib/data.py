@@ -65,10 +65,7 @@ def fetch_monthly_prices(
     result = result.dropna(how="all")
     
     if len(result) < 13:
-        raise RuntimeError(
-            f"Only {len(result)} months of data available, need at least 13 "
-            f"for 12-month momentum calculation."
-        )
+        raise RuntimeError(f"Only {len(result)} months of data available, need at least 13 for momentum.")
     
     return result
 
@@ -111,95 +108,26 @@ def fetch_daily_prices(
         if yahoo_ticker in close.columns:
             result[strategy_ticker] = close[yahoo_ticker]
         else:
-            logger.warning(f"No daily data for {strategy_ticker} ({yahoo_ticker})")
             result[strategy_ticker] = float("nan")
     
     result = result.ffill().dropna(how="all")
     
     if len(result) < 200:
-        raise RuntimeError(
-            f"Only {len(result)} days of data available, need at least 200 "
-            f"for correlation calculation."
-        )
+        raise RuntimeError(f"Only {len(result)} days of data available.")
     
     return result
 
 
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
-    Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Most reliable version: uses browser User-Agent + very lenient parsing.
+    Fetch monthly US Unemployment Rate (UNRATE) from FRED with timeout + fallback.
+    Never hangs longer than 12 seconds.
     """
     if end_date is None:
         end_date = datetime.now()
     
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    # Use a realistic browser User-Agent (FRED sometimes blocks default Python requests)
-    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-    
-    with urlopen(req) as response:
-        raw_text = response.read().decode('utf-8')
-    
-    # Parse manually with very lenient rules
-    data = []
-    for line in raw_text.splitlines():
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        parts = line.split()
-        if len(parts) >= 2:
-            date_str = parts[0]
-            value_str = parts[1]
-            try:
-                date = pd.to_datetime(date_str, format='%Y-%m-%d')
-                value = float(value_str)
-                data.append((date, value))
-            except:
-                continue  # skip any malformed line
-    
-    if not data:
-        # Log first 20 lines for debugging if nothing was parsed
-        logger.error("FRED response started with:")
-        for line in raw_text.splitlines()[:20]:
-            logger.error(repr(line))
-        raise RuntimeError("Failed to parse any unemployment data from FRED")
-    
-    df = pd.DataFrame(data, columns=['DATE', 'VALUE'])
-    df = df.set_index('DATE')
-    ue = df['VALUE']
-    ue = ue.resample("ME").last()
-    
-    logger.info("Successfully fetched unemployment rate from FRED")
-    return ue
-
-
-def get_last_trading_day(date: Optional[datetime] = None) -> datetime:
-    """Determine the last trading day of the month."""
-    if date is None:
-        date = datetime.now()
-    
-    if date.month == 12:
-        last_day = datetime(date.year + 1, 1, 1) - timedelta(days=1)
-    else:
-        last_day = datetime(date.year, date.month + 1, 1) - timedelta(days=1)
-    
-    while last_day.weekday() > 4:
-        last_day -= timedelta(days=1)
-    
-    return last_day
-
-
-def is_last_trading_day(date: Optional[datetime] = None) -> bool:
-    if date is None:
-        date = datetime.now()
-    return date.date() == get_last_trading_day(date).date()
-
-
-def is_first_trading_day(date: Optional[datetime] = None) -> bool:
-    if date is None:
-        date = datetime.now()
-    first_day = datetime(date.year, date.month, 1)
-    while first_day.weekday() > 4:
-        first_day += timedelta(days=1)
-    return date.date() == first_day.date()
+    for attempt in range(3):
+        try:
+           

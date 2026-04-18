@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
-from urllib.request import urlopen   # needed for direct FRED fetch
+from urllib.request import urlopen, Request
 
 logger = logging.getLogger(__name__)
 
@@ -128,26 +128,29 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch monthly US Unemployment Rate (UNRATE) directly from FRED.
-    Most robust version: manual line-by-line parsing to avoid all tokenizing issues.
+    Most reliable version: uses browser User-Agent + very lenient parsing.
     """
     if end_date is None:
         end_date = datetime.now()
     
     url = "https://fred.stlouisfed.org/data/UNRATE.txt"
     
-    # Download raw text
-    with urlopen(url) as response:
+    # Use a realistic browser User-Agent (FRED sometimes blocks default Python requests)
+    req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+    
+    with urlopen(req) as response:
         raw_text = response.read().decode('utf-8')
     
-    # Parse manually
+    # Parse manually with very lenient rules
     data = []
     for line in raw_text.splitlines():
         line = line.strip()
         if not line or line.startswith('#'):
             continue
         parts = line.split()
-        if len(parts) == 2:
-            date_str, value_str = parts
+        if len(parts) >= 2:
+            date_str = parts[0]
+            value_str = parts[1]
             try:
                 date = pd.to_datetime(date_str, format='%Y-%m-%d')
                 value = float(value_str)
@@ -156,6 +159,10 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
                 continue  # skip any malformed line
     
     if not data:
+        # Log first 20 lines for debugging if nothing was parsed
+        logger.error("FRED response started with:")
+        for line in raw_text.splitlines()[:20]:
+            logger.error(repr(line))
         raise RuntimeError("Failed to parse any unemployment data from FRED")
     
     df = pd.DataFrame(data, columns=['DATE', 'VALUE'])
@@ -163,7 +170,7 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     ue = df['VALUE']
     ue = ue.resample("ME").last()
     
-    logger.info("Successfully fetched unemployment rate from FRED (manual parse)")
+    logger.info("Successfully fetched unemployment rate from FRED")
     return ue
 
 

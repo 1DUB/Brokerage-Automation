@@ -1,6 +1,6 @@
 """
 Data fetching layer for the Brokerage Model.
-- Yahoo Finance for prices
+- Yahoo Finance for prices (unchanged)
 - Official FRED API for UNRATE (exact original Lethargic rule)
 """
 
@@ -124,7 +124,6 @@ def fetch_daily_prices(
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
     Fetch exact US Unemployment Rate (UNRATE) using official FRED API.
-    Falls back safely if key is missing or API fails.
     """
     if end_date is None:
         end_date = datetime.now()
@@ -132,11 +131,10 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
         logger.warning("FRED_API_KEY not set — using fallback unemployment series")
-        # Safe fallback (24 months ending today)
         dates = pd.date_range(end=end_date, periods=24, freq="ME")
-        return pd.Series([4.1] * 24, index=dates)
+        return pd.Series([4.1] * len(dates), index=dates)
 
-    # Official FRED API call
+    # Official FRED API
     url = (
         f"https://api.stlouisfed.org/fred/series/observations?"
         f"series_id=UNRATE"
@@ -154,7 +152,7 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
             
             obs = data.get("observations", [])
             df = pd.DataFrame(obs)
-            df = df[df["value"] != "."]                    # remove missing
+            df = df[df["value"] != "."]
             df["date"] = pd.to_datetime(df["date"])
             df = df.set_index("date")
             ue = df["value"].astype(float)
@@ -165,14 +163,20 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
             
         except Exception as e:
             logger.warning(f"FRED API attempt {attempt+1} failed: {e}")
+            # Log the response body on 400 so we can see exactly what FRED said
+            if "400" in str(e):
+                try:
+                    error_body = response.read().decode("utf-8")
+                    logger.error(f"FRED 400 response body: {error_body}")
+                except:
+                    pass
             if attempt < 2:
                 import time
                 time.sleep(2 ** attempt)
 
-    # Final safe fallback
     logger.error("FRED API failed after 3 attempts — using fallback")
     dates = pd.date_range(end=end_date, periods=24, freq="ME")
-    return pd.Series([4.1] * 24, index=dates)
+    return pd.Series([4.1] * len(dates), index=dates)
 
 
 def get_last_trading_day(date: Optional[datetime] = None) -> datetime:

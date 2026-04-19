@@ -19,7 +19,7 @@ MODULES = [
     ("Stress",   ["GLD", "TLT"]),
 ]
 
-ALL_TICKERS = ["SPY", "IEFA", "LQD", "HYG", "VNQ", "REM", "GLD", "TLT", "CASH"]
+ALL_TICKERS = ["SPY", "IEFA", "LQD", "HYG", "VNQ", "REM", "GLD", "TLT", "BIL"]
 
 
 @dataclass
@@ -43,9 +43,10 @@ def _dual_momentum(prices: pd.DataFrame, pair: list) -> str:
     mom_b = momentum_13612u(prices[b])
     winner = a if mom_a > mom_b else b
 
-    # Absolute momentum vs cash (BIL)
+    # Absolute momentum check vs cash (BIL)
+    mom_winner = momentum_13612u(prices[winner])
     mom_cash = momentum_13612u(prices["BIL"])
-    return winner if mom_winner := momentum_13612u(prices[winner]) > mom_cash else "CASH"
+    return winner if mom_winner > mom_cash else "CASH"
 
 
 def compute_cdm_signals(monthly_prices: pd.DataFrame) -> CDM_Signal:

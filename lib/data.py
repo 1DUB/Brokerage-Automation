@@ -1,13 +1,15 @@
 """
-Data fetching layer. Downloads monthly adjusted-close prices from Yahoo Finance + FRED.
+Data fetching layer. Downloads monthly adjusted-close prices from Yahoo Finance + FRED API.
 """
 
 import yfinance as yf
 import pandas as pd
+import json
+import os
 from datetime import datetime, timedelta
 from typing import List, Optional
 import logging
-from urllib.request import urlopen, Request
+from urllib.request import Request, urlopen
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,10 @@ def fetch_monthly_prices(
     result = result.dropna(how="all")
     
     if len(result) < 13:
-        raise RuntimeError(f"Only {len(result)} months of data available, need at least 13 for momentum.")
+        raise RuntimeError(
+            f"Only {len(result)} months of data available, need at least 13 "
+            f"for 12-month momentum calculation."
+        )
     
     return result
 
@@ -108,26 +113,93 @@ def fetch_daily_prices(
         if yahoo_ticker in close.columns:
             result[strategy_ticker] = close[yahoo_ticker]
         else:
+            logger.warning(f"No daily data for {strategy_ticker} ({yahoo_ticker})")
             result[strategy_ticker] = float("nan")
     
     result = result.ffill().dropna(how="all")
     
     if len(result) < 200:
-        raise RuntimeError(f"Only {len(result)} days of data available.")
+        raise RuntimeError(
+            f"Only {len(result)} days of data available, need at least 200 "
+            f"for correlation calculation."
+        )
     
     return result
 
 
 def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     """
-    Fetch monthly US Unemployment Rate (UNRATE) from FRED with timeout + fallback.
-    Never hangs longer than 12 seconds.
+    Fetch US Unemployment Rate (UNRATE) using the official FRED API.
+    Uses your FRED_API_KEY stored in GitHub Secrets (exactly like RESEND_API_KEY).
     """
     if end_date is None:
         end_date = datetime.now()
     
-    url = "https://fred.stlouisfed.org/data/UNRATE.txt"
-    
+    api_key = os.environ.get("FRED_API_KEY")
+    if not api_key:
+        logger.warning("FRED_API_KEY not set — using fallback unemployment rate (4.1%)")
+        dates = pd.date_range(end=end_date, periods=36, freq="ME")
+        return pd.Series([4.1] * 36, index=dates)
+
+    url = (
+        f"https://api.stlouisfed.org/fred/series/observations?"
+        f"series_id=UNRATE&api_key={api_key}&file_type=json"
+        f"&limit=0&sort_order=asc"   # fetch all observations
+    )
+
     for attempt in range(3):
         try:
-           
+            req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urlopen(req, timeout=15) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            
+            observations = data["observations"]
+            df = pd.DataFrame(observations)
+            df = df[df["value"] != "."]                     # remove missing values
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.set_index("date")
+            ue = df["value"].astype(float)
+            ue = ue.resample("ME").last()
+            
+            logger.info(f"Successfully fetched {len(ue)} months of UNRATE via FRED API")
+            return ue
+            
+        except Exception as e:
+            logger.warning(f"FRED API attempt {attempt+1} failed: {e}")
+            if attempt < 2:
+                time.sleep(2 ** attempt)  # backoff
+
+    logger.error("FRED API failed after 3 attempts — using fallback")
+    dates = pd.date_range(end=end_date, periods=36, freq="ME")
+    return pd.Series([4.1] * 36, index=dates)
+
+
+def get_last_trading_day(date: Optional[datetime] = None) -> datetime:
+    """Determine the last trading day of the month."""
+    if date is None:
+        date = datetime.now()
+    
+    if date.month == 12:
+        last_day = datetime(date.year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = datetime(date.year, date.month + 1, 1) - timedelta(days=1)
+    
+    while last_day.weekday() > 4:
+        last_day -= timedelta(days=1)
+    
+    return last_day
+
+
+def is_last_trading_day(date: Optional[datetime] = None) -> bool:
+    if date is None:
+        date = datetime.now()
+    return date.date() == get_last_trading_day(date).date()
+
+
+def is_first_trading_day(date: Optional[datetime] = None) -> bool:
+    if date is None:
+        date = datetime.now()
+    first_day = datetime(date.year, date.month, 1)
+    while first_day.weekday() > 4:
+        first_day += timedelta(days=1)
+    return date.date() == first_day.date()

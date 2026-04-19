@@ -1,6 +1,6 @@
 """
 Data fetching layer for the Brokerage Model.
-- Yahoo Finance for prices (unchanged)
+- Yahoo Finance for prices
 - Official FRED API for UNRATE (exact original Lethargic rule)
 """
 
@@ -132,10 +132,9 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
     api_key = os.environ.get("FRED_API_KEY")
     if not api_key:
         logger.warning("FRED_API_KEY not set — using fallback unemployment series")
-        # Safe fallback (recent real values)
+        # Safe fallback (24 months ending today)
         dates = pd.date_range(end=end_date, periods=24, freq="ME")
-        values = [4.2] * 24
-        return pd.Series(values, index=dates)
+        return pd.Series([4.1] * 24, index=dates)
 
     # Official FRED API call
     url = (
@@ -143,7 +142,7 @@ def fetch_unemployment_rate(end_date: Optional[datetime] = None) -> pd.Series:
         f"series_id=UNRATE"
         f"&api_key={api_key}"
         f"&file_type=json"
-        f"&limit=0"          # all observations
+        f"&limit=0"
         f"&sort_order=asc"
     )
 

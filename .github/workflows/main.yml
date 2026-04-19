@@ -8,6 +8,19 @@ env:
   # Opt into Node.js 24 to silence deprecation warnings.
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+  - name: Run signal computation
+  env:
+    RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+    TAA_EMAIL_TO: ${{ secrets.TAA_EMAIL_TO }}
+    TAA_EMAIL_FROM: ${{ secrets.TAA_EMAIL_FROM }}
+    FRED_API_KEY: ${{ secrets.FRED_API_KEY }}     # ← ADD THIS LINE
+  run: |
+    if [ "${{ github.event.inputs.force }}" = "true" ]; then
+      python run_monthly.py --force
+    else
+      python run_monthly.py
+    fi
+
 on:
   schedule:
     # Run at 9:30 PM ET (01:30 UTC next day) on the last 5 days of each month

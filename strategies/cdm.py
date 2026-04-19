@@ -19,7 +19,7 @@ MODULES = [
     ("Stress",   ["GLD", "TLT"]),
 ]
 
-ALL_TICKERS = ["SPY", "IEFA", "LQD", "HYG", "VNQ", "REM", "GLD", "TLT", "BIL"]
+ALL_TICKERS = ["SPY", "IEFA", "LQD", "HYG", "VNQ", "REM", "GLD", "TLT", "CASH"]
 
 
 @dataclass

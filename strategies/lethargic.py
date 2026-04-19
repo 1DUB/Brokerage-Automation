@@ -1,5 +1,6 @@
 """
 Wouter Keller’s Lethargic Asset Allocation (20% sleeve)
+Exact original GT timing rule (UE MA3 rising AND SPY not in uptrend)
 """
 
 import pandas as pd
@@ -9,7 +10,7 @@ from typing import Dict
 from lib.data import fetch_unemployment_rate
 from lib.momentum import momentum_13612u
 
-ALL_TICKERS = ["VTV", "GLD", "IEF", "QQQ"]
+ALL_TICKERS = ["VTV", "GLD", "IEF", "QQQ", "SPY"]
 
 
 @dataclass
@@ -29,7 +30,7 @@ class LethargicSignal:
 def compute_lethargic_signals(monthly_prices: pd.DataFrame) -> LethargicSignal:
     signal_date = monthly_prices.index[-1].strftime("%Y-%m-%d")
     
-    # Growth-Trend Timing rule
+    # Exact original Growth-Trend Timing rule
     ue_rate = fetch_unemployment_rate()
     ue_ma3 = ue_rate.rolling(3).mean()
     ue_rising = ue_ma3.iloc[-1] > ue_ma3.iloc[-2] if len(ue_ma3) >= 2 else False

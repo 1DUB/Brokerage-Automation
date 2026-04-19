@@ -6,11 +6,12 @@ Automated monthly signal computation for a 3-strategy portfolio optimized for **
 
 ## Portfolio
 
-| Strategy | Weight | Status |
-|---|---|---|
-| NLX Hybrid AA 60/40 | 40% | ✅ Implemented |
-| Stoken’s ACA [Dynamic Bond] | 40% | ✅ Implemented |
-| Lethargic Asset Allocation | 20% | ✅ Implemented |
+| Strategy                        | Weight | Status |
+|---------------------------------|--------|--------|
+| Stoken’s ACA [Dynamic Bond]     | 40%    | ✅     |
+| Composite Dual Momentum         | 25%    | ✅     |
+| Lethargic Asset Allocation      | 20%    | ✅     |
+| NLX Hybrid AA 60/40             | 15%    | ✅     |
 
 ## How it works
 

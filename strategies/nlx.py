@@ -1,5 +1,10 @@
 """
 NLX Finance’s Hybrid Asset Allocation 60/40 (40% sleeve)
+
+Exact rules from Allocate Smartly and the NLX Finance blog:
+- Canary: TIP momentum (12/6/3/1 weighted)
+- Risk-on:  60% SPY / 40% IEF
+- Risk-off: 100% CASH
 """
 
 import pandas as pd
@@ -8,11 +13,8 @@ from typing import Dict
 
 from lib.momentum import momentum_13612u
 
-OFFENSIVE_UNIVERSE = ["SPY", "IWM", "IEFA", "IEMG", "VNQ", "PDBC", "IEF", "TLT"]
-DEFENSIVE_UNIVERSE = ["BIL", "IEF"]
-CANARY_UNIVERSE = ["TIP"]
-
-ALL_TICKERS = list(set(OFFENSIVE_UNIVERSE + DEFENSIVE_UNIVERSE + CANARY_UNIVERSE))
+# Only the assets actually needed for price fetching
+ALL_TICKERS = ["SPY", "IEF", "TIP"]
 
 
 @dataclass
@@ -26,9 +28,9 @@ class NLXSignal:
         lines = [f"  Signal date: {self.signal_date}"]
         lines.append(f"  Canary TIP momentum: {self.canary_momentum:+.2%} ({'RISK-ON' if self.is_risk_on else 'RISK-OFF'})")
         if self.is_risk_on:
-            lines.append("  Risk-on → 60% SPY / 40% IEF")
+            lines.append("  Risk-on  → 60% SPY / 40% IEF")
         else:
-            lines.append("  Risk-off → defensive asset")
+            lines.append("  Risk-off → 100% CASH")
         lines.append("  Final allocation:")
         for t, w in sorted(self.allocation.items(), key=lambda x: -x[1]):
             if w > 0.001:
@@ -38,16 +40,16 @@ class NLXSignal:
 
 def compute_nlx_signals(prices: pd.DataFrame) -> NLXSignal:
     signal_date = prices.index[-1].strftime("%Y-%m-%d")
+    
+    # Canary signal
     tip_mom = momentum_13612u(prices["TIP"])
     is_risk_on = tip_mom > 0
 
-    def_moms = {t: momentum_13612u(prices[t]) for t in DEFENSIVE_UNIVERSE}
-    best_def = max(def_moms, key=def_moms.get)
-
+    # Exact allocation from Allocate Smartly chart
     if is_risk_on:
         allocation = {"SPY": 0.60, "IEF": 0.40}
     else:
-        allocation = {best_def: 1.0}
+        allocation = {"CASH": 1.0}
 
     return NLXSignal(
         signal_date=signal_date,

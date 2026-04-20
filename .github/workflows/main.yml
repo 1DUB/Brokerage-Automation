@@ -27,6 +27,10 @@ on:
           - 'true'
           - 'false'
 
+# Required for the commit-back step to push stoken_state.json
+permissions:
+  contents: write
+
 jobs:
   compute-signals:
     runs-on: ubuntu-latest
@@ -48,10 +52,22 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           TAA_EMAIL_TO: ${{ secrets.TAA_EMAIL_TO }}
           TAA_EMAIL_FROM: ${{ secrets.TAA_EMAIL_FROM }}
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}      # ← This line was missing
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
         run: |
           if [ "${{ github.event.inputs.force }}" = "true" ]; then
             python run_monthly.py --force
           else
             python run_monthly.py
+          fi
+      
+      - name: Commit Stoken state
+        run: |
+          # stoken_state.json tracks which modules are in risk vs defensive
+          # position — needed for the hold-between-channels logic.
+          if [ -f stoken_state.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add stoken_state.json
+            git diff --cached --quiet || git commit -m "Update Stoken channel state [automated]"
+            git push
           fi

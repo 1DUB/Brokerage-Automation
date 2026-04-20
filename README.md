@@ -2,7 +2,7 @@
 
 **Tax-efficient monthly Tactical Asset Allocation (TAA) for taxable brokerage accounts.**
 
-Automated monthly signal computation for a 3-strategy portfolio optimized for **low turnover and tax efficiency** while maintaining strong risk-adjusted returns.
+Automated monthly signal computation for a 4-strategy portfolio optimized for **low turnover and tax efficiency** while maintaining strong risk-adjusted returns.
 
 ## Portfolio
 
@@ -87,4 +87,4 @@ If an ETF is delisted or renamed, update the TICKER_ALIASES dict in lib/data.py.
 - NLX Finance — “The HAA Strategy Revisited” (Hybrid AA 60/40)
 - Wouter Keller — “Growth-Trend Timing and 60-40 Variations: Lethargic Asset Allocation”
 - Dick Stoken — “Survival of the Fittest for Investors” (Active Combined Asset with Dynamic Bond variation)
-- Investment Policy Statement v1.2 (maintained separately)
+- Investment Policy Statement v2.1 (maintained separately)

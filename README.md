@@ -64,6 +64,7 @@ brokerage-model/
 │   ├── nlx.py              # NLX Hybrid AA 60/40
 │   ├── stoken.py           # Stoken’s ACA [Dynamic Bond]
 │   └── lethargic.py        # Lethargic Asset Allocation
+│   └── cdm.py              # Composite Dual Momentum (CDM)
 ├── lib/
 │   ├── data.py             # Yahoo Finance + FRED unemployment data
 │   ├── momentum.py         # Shared momentum formulas

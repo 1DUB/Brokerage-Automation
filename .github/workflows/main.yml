@@ -1,6 +1,6 @@
 # Brokerage Model Monthly Signal Generator
-# Runs on the last week of each month and first day of each month.
-# The script self-checks whether today is an actual trading day.
+# Runs on the last week of each month only (single-day execution).
+# The script self-checks whether today is the last trading day.
 
 name: Brokerage Model Monthly Signals
 
@@ -10,10 +10,11 @@ env:
 
 on:
   schedule:
-    # Run at 9:30 PM ET (01:30 UTC next day) on the last 5 days of each month
-    # and the first 2 days of each month.
-    - cron: '30 1 27-31 * *'  # Last few days of month (Tranche 1 candidate)
-    - cron: '30 1 1-2 * *'    # First few days of month (Tranche 2 candidate)
+    # Run at 9:30 PM ET (01:30 UTC next day) on the last 5 days of each month.
+    # The Python script will exit early if today is not the last trading day.
+    # No first-of-month run — taxable account uses single-day execution
+    # per IPS v2.1 Section 4.2 (no tranching).
+    - cron: '30 1 27-31 * *'
   
   # Allow manual trigger from the Actions tab
   workflow_dispatch:

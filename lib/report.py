@@ -8,7 +8,6 @@ from typing import Dict, List, Optional, Any
 
 def format_report(
     signal_date: str,
-    tranche: int,  # 1 or 2
     combined_allocation: Dict[str, float],
     strategy_summaries: Dict[str, str],  # strategy_name -> summary text
     previous_allocation: Optional[Dict[str, float]] = None,
@@ -21,23 +20,20 @@ def format_report(
     Returns:
         (subject, body) tuple of strings.
     """
-    subject = f"[Brokerage Model] Tranche {tranche} Signals — {signal_date}"
+    subject = f"[Brokerage Model] Monthly Signals — {signal_date}"
     
     lines = []
     lines.append("=" * 60)
-    lines.append(f"  Brokerage Model Monthly Signal Report — Tranche {tranche} of 2")
+    lines.append(f"  Brokerage Model Monthly Signal Report")
     lines.append(f"  Signal date: {signal_date}")
     
     if phase_notice:
         lines.append("")
         lines.append(f"  ⚠ {phase_notice}")
     
-    if tranche == 1:
-        lines.append("  Action: Execute 50% of rebalancing trades at today's close.")
-        lines.append("  Tranche 2 (same allocations) fires next trading day.")
-    else:
-        lines.append("  Action: Execute remaining 50% of rebalancing trades.")
-        lines.append("  Same allocations as Tranche 1 — no new signals computed.")
+    lines.append("  Action: Execute 100% of rebalancing trades at today's")
+    lines.append("          close. Single-day execution per IPS v2.1")
+    lines.append("          Section 4.2 (no tranching — fewer taxable events).")
     
     lines.append("=" * 60)
     lines.append("")
@@ -120,11 +116,15 @@ def format_report(
     # ── Footer ───────────────────────────────────────────────────────
     lines.append("-" * 60)
     lines.append("EXECUTION REMINDER:")
-    lines.append("  Per IPS v2.1 Section 4, execute trades per your account's")
-    lines.append("  execution rules. Minimum trade threshold: for positions")
-    lines.append("  being adjusted, skip the trade if drift is less than 20%")
-    lines.append("  of the target allocation. Always execute additions")
+    lines.append("  Per IPS v2.1 Section 4.2, execute all trades in a")
+    lines.append("  single day. Minimum trade threshold: for positions")
+    lines.append("  being adjusted, skip the trade if drift is less than")
+    lines.append("  20% of the target allocation. Always execute additions")
     lines.append("  (from 0%) and removals (to 0%).")
+    lines.append("")
+    lines.append("  Tax-loss harvesting: when selling at a loss, consider")
+    lines.append("  whether the loss can offset gains elsewhere. Document")
+    lines.append("  any tax-motivated trades in the trading journal.")
     lines.append("")
     lines.append(f"  Report generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}")
     lines.append("=" * 60)

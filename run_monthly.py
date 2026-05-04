@@ -2,7 +2,10 @@
 """
 Brokerage Model Monthly Signal Generator
 
-Stoken 40% + Composite Dual Momentum 25% + NLX 15% + Lethargic 20%
+Stoken 40% + Composite Dual Momentum 25% + Lethargic 20%  + NLX 15%
+
+Single-day execution per IPS v2.1 Section 4.2 — no tranching.
+Runs on the last trading day of each month only.
 """
 
 import sys
@@ -13,11 +16,10 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from lib.data import fetch_monthly_prices, fetch_daily_prices, is_last_trading_day, is_first_trading_day
+from lib.data import fetch_monthly_prices, fetch_daily_prices, is_last_trading_day
 from lib.report import format_report, run_sanity_checks
 from lib.notify import send_email, send_failure_alert
 
-# New strategies
 from strategies.stoken import compute_stoken_signals
 from strategies.cdm import compute_cdm_signals
 from strategies.nlx import compute_nlx_signals
@@ -26,9 +28,9 @@ from strategies.lethargic import compute_lethargic_signals
 logger = logging.getLogger("brokerage-model")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
-# New weights
+# Strategy weights (per IPS v2.1)
 STRATEGY_WEIGHTS = {
-    "Stoken’s ACA [Dynamic Bond]": 0.40,
+    "Stoken's ACA [Dynamic Bond]": 0.40,
     "Composite Dual Momentum": 0.25,
     "NLX Hybrid AA 60/40": 0.15,
     "Lethargic Asset Allocation": 0.20,
@@ -39,17 +41,17 @@ def main(force: bool = False):
     today = datetime.now()
 
     if is_last_trading_day(today):
-        tranche = 1
-    elif is_first_trading_day(today):
-        tranche = 2
+        pass  # proceed
     elif force:
-        tranche = 1
-        logger.info("FORCE mode: running despite not being a trading day.")
+        logger.info("FORCE mode: running despite not being the last trading day.")
     else:
-        logger.info(f"Today is not a scheduled trading day. Use --force to run.")
+        logger.info(
+            f"Today ({today.strftime('%Y-%m-%d')}) is not the last trading day "
+            f"of the month. Use --force to run anyway."
+        )
         return
 
-    logger.info(f"Running Brokerage Model — Tranche {tranche}")
+    logger.info("Running Brokerage Model — single-day execution")
 
     # Fetch data (all tickers from all strategies)
     all_tickers = ["SPY", "IEF", "GLD", "TLT", "VNQ", "BIL", "TIP", "IEFA", "LQD", "HYG", "REM", "VTV", "QQQ"]
@@ -61,8 +63,8 @@ def main(force: bool = False):
     strategy_summaries = {}
 
     stoken_sig = compute_stoken_signals(monthly_prices)
-    strategy_allocations["Stoken’s ACA [Dynamic Bond]"] = stoken_sig.allocation
-    strategy_summaries["Stoken’s ACA [Dynamic Bond] (40% sleeve)"] = stoken_sig.summary()
+    strategy_allocations["Stoken's ACA [Dynamic Bond]"] = stoken_sig.allocation
+    strategy_summaries["Stoken's ACA [Dynamic Bond] (40% sleeve)"] = stoken_sig.summary()
 
     cdm_sig = compute_cdm_signals(monthly_prices)
     strategy_allocations["Composite Dual Momentum"] = cdm_sig.allocation
@@ -88,7 +90,6 @@ def main(force: bool = False):
     signal_date = monthly_prices.index[-1].strftime("%Y-%m-%d")
     subject, body = format_report(
         signal_date=signal_date,
-        tranche=tranche,
         combined_allocation=combined,
         strategy_summaries=strategy_summaries,
         previous_allocation=None,
